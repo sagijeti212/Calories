@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0ea5e9"/>
+  <title>Calorie Calculator · Калькулятор калорий</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" href="assets/icons/icon-192.png">
+  <link rel="stylesheet" href="assets/style.css" />
+</head>
+<body>
+  <header class="container">
+    <h1 id="appTitle">Calorie Calculator</h1>
+    <div class="controls">
+      <label for="langSelect"><span id="langLabel">Language</span>:</label>
+      <select id="langSelect">
+        <option value="en">English</option>
+        <option value="ru">Русский</option>
+      </select>
+      <button id="installBtn" class="btn secondary" hidden>Install</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <nav class="tabs">
+      <button class="tab active" data-tab="needs" id="tab-needs">Daily Needs</button>
+      <button class="tab" data-tab="planner" id="tab-planner">Meal Planner</button>
+      <button class="tab" data-tab="foods" id="tab-foods">Food Database</button>
+    </nav>
+
+    <!-- Needs (BMR/TDEE) -->
+    <section id="panel-needs" class="panel active">
+      <h2 id="bmrTitle">BMR &amp; TDEE</h2>
+      <form id="bmrForm" class="grid">
+        <div class="field">
+          <label id="sexLabel">Sex</label>
+          <div class="row">
+            <label><input type="radio" name="sex" value="male" checked> <span id="maleLabel">Male</span></label>
+            <label><input type="radio" name="sex" value="female"> <span id="femaleLabel">Female</span></label>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="ageInput" id="ageLabel">Age</label>
+          <input id="ageInput" type="number" min="1" max="120" value="30" required>
+        </div>
+
+        <div class="field">
+          <label id="unitLabel">Units</label>
+          <div class="row">
+            <label><input type="radio" name="units" value="metric" checked> <span id="metricLabel">Metric (kg/cm)</span></label>
+            <label><input type="radio" name="units" value="imperial"> <span id="imperialLabel">Imperial (lb/in)</span></label>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="weightInput" id="weightLabel">Weight</label>
+          <input id="weightInput" type="number" min="1" value="75" required>
+        </div>
+
+        <div class="field">
+          <label for="heightInput" id="heightLabel">Height</label>
+          <input id="heightInput" type="number" min="1" value="175" required>
+        </div>
+
+        <div class="field">
+          <label for="activitySelect" id="activityLabel">Activity Level</label>
+          <select id="activitySelect">
+            <option value="1.2" id="actSed">Sedentary (little or no exercise)</option>
+            <option value="1.375" id="actLight">Light (1–3 days/week)</option>
+            <option value="1.55" id="actModerate">Moderate (3–5 days/week)</option>
+            <option value="1.725" id="actActive">Active (6–7 days/week)</option>
+            <option value="1.9" id="actVery">Very active (physical job or twice/day)</option>
+          </select>
+        </div>
+
+        <div class="field full">
+          <button class="btn primary" type="submit" id="calcBtn">Calculate</button>
+        </div>
+      </form>
+
+      <div class="cards" id="bmrResults" hidden>
+        <div class="card">
+          <div class="card-title" id="bmrResultLabel">BMR</div>
+          <div class="card-value"><span id="bmrVal">—</span> kcal</div>
+        </div>
+        <div class="card">
+          <div class="card-title" id="tdeeResultLabel">TDEE</div>
+          <div class="card-value"><span id="tdeeVal">—</span> kcal</div>
+        </div>
+        <div class="card">
+          <div class="card-title" id="maintLabel">Maintenance</div>
+          <div class="card-value"><span id="maintVal">—</span> kcal</div>
+        </div>
+        <div class="card">
+          <div class="card-title" id="mildLossLabel">Mild loss (-10%)</div>
+          <div class="card-value"><span id="mildLossVal">—</span> kcal</div>
+        </div>
+        <div class="card">
+          <div class="card-title" id="lossLabel">Loss (-20%)</div>
+          <div class="card-value"><span id="lossVal">—</span> kcal</div>
+        </div>
+        <div class="card">
+          <div class="card-title" id="gainLabel">Gain (+10%)</div>
+          <div class="card-value"><span id="gainVal">—</span> kcal</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Planner -->
+    <section id="panel-planner" class="panel">
+      <h2 id="plannerTitle">Meal Planner</h2>
+      <div class="planner-controls">
+        <button id="savePlanBtn" class="btn primary">Save plan</button>
+        <button id="clearPlanBtn" class="btn danger">Clear plan</button>
+      </div>
+      <div class="table-wrap">
+        <table id="plannerTable">
+          <thead>
+            <tr>
+              <th id="thFood">Food</th>
+              <th id="thGrams">Grams</th>
+              <th id="thCalories">Calories</th>
+              <th id="thProtein">Protein</th>
+              <th id="thFat">Fat</th>
+              <th id="thCarbs">Carbs</th>
+              <th id="thActions">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="plannerBody"></tbody>
+          <tfoot>
+            <tr class="totals">
+              <td id="totalsLabel" colspan="2">Totals</td>
+              <td><strong id="totalCal">0</strong></td>
+              <td><strong id="totalProt">0</strong> g</td>
+              <td><strong id="totalFat">0</strong> g</td>
+              <td><strong id="totalCarb">0</strong> g</td>
+              <td></td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      <div class="row add-row">
+        <input id="addFoodInput" list="foodList" placeholder="Food">
+        <datalist id="foodList"></datalist>
+        <input id="addGramsInput" type="number" min="1" placeholder="Grams" value="100">
+        <button id="addItemBtn" class="btn secondary">Add item</button>
+      </div>
+    </section>
+
+    <!-- Foods -->
+    <section id="panel-foods" class="panel">
+      <h2 id="foodsTitle">Food Database</h2>
+      <input id="foodSearch" placeholder="Search">
+      <div id="foodsGrid" class="foods-grid"></div>
+
+      <details class="custom-block">
+        <summary id="addCustomTitle">Add custom food</summary>
+        <form id="customFoodForm" class="grid small">
+          <div class="field">
+            <label for="cfName" id="cfNameLabel">Name</label>
+            <input id="cfName" required />
+          </div>
+          <div class="field">
+            <label for="cfCal" id="cfCalLabel">Calories (per 100g)</label>
+            <input id="cfCal" type="number" min="0" step="0.1" required />
+          </div>
+          <div class="field">
+            <label for="cfProt" id="cfProtLabel">Protein (g/100g)</label>
+            <input id="cfProt" type="number" min="0" step="0.1" required />
+          </div>
+          <div class="field">
+            <label for="cfFat" id="cfFatLabel">Fat (g/100g)</label>
+            <input id="cfFat" type="number" min="0" step="0.1" required />
+          </div>
+          <div class="field">
+            <label for="cfCarb" id="cfCarbLabel">Carbs (g/100g)</label>
+            <input id="cfCarb" type="number" min="0" step="0.1" required />
+          </div>
+          <div class="field full">
+            <button class="btn primary" id="cfSaveBtn" type="submit">Save</button>
+          </div>
+        </form>
+      </details>
+    </section>
+  </main>
+
+  <footer class="container">
+    <small>© 2025 Calorie Calculator · MIT License</small>
+  </footer>
+
+  <script src="assets/app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(console.error);
+      });
+    }
+  </script>
+</body>
+</html>
