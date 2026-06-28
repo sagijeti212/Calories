@@ -17,8 +17,7 @@ android {
         versionCode = 1
         versionName = "1.0"
 
-        // Replace with your actual Alpha Vantage API key from https://www.alphavantage.co/support/#api-key
-        buildConfigField("String", "ALPHA_VANTAGE_API_KEY", "\"demo\"")
+        buildConfigField("String", "ALPHA_VANTAGE_API_KEY", "\"L6IR7GK2BUJBTDTL\"")
         buildConfigField("String", "ALPHA_VANTAGE_BASE_URL", "\"https://www.alphavantage.co/\"")
     }
 
