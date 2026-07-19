@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="ka">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🌍 გლობალური განგაშის მონიტორი — Global Alert Monitor</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+  :root{
+    --bg:#0b1220; --panel:#111a2e; --panel2:#0e1626; --border:#1e2a44;
+    --text:#e6edf7; --muted:#8ea0bf; --accent:#38bdf8;
+    --quake:#f59e0b; --fire:#ef4444; --storm:#8b5cf6; --volcano:#f97316;
+    --weather:#22d3ee; --flood:#3b82f6; --other:#94a3b8;
+    --sev-red:#ef4444; --sev-orange:#f59e0b; --sev-green:#22c55e;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans Georgian",sans-serif;
+    background:var(--bg); color:var(--text); display:flex; flex-direction:column; overflow:hidden;
+  }
+  header{
+    display:flex; align-items:center; gap:14px; padding:10px 16px;
+    background:var(--panel); border-bottom:1px solid var(--border); flex-wrap:wrap; z-index:1000;
+  }
+  header h1{font-size:1.05rem; font-weight:700; display:flex; align-items:center; gap:8px; white-space:nowrap}
+  .pulse{width:10px;height:10px;border-radius:50%;background:var(--sev-green);animation:pulse 1.6s infinite}
+  .pulse.err{background:var(--sev-red)}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(34,197,94,.6)}70%{box-shadow:0 0 0 9px rgba(34,197,94,0)}100%{box-shadow:0 0 0 0 rgba(34,197,94,0)}}
+  #status{font-size:.78rem;color:var(--muted);white-space:nowrap}
+  .stats{display:flex;gap:8px;flex-wrap:wrap;margin-left:auto}
+  .stat{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:4px 10px;font-size:.78rem;display:flex;gap:6px;align-items:center}
+  .stat b{font-size:.95rem}
+  .btn{
+    background:var(--panel2);border:1px solid var(--border);color:var(--text);
+    border-radius:8px;padding:6px 12px;font-size:.8rem;cursor:pointer;transition:.15s;white-space:nowrap
+  }
+  .btn:hover{border-color:var(--accent);color:var(--accent)}
+  .btn.on{background:var(--accent);color:#04121e;border-color:var(--accent);font-weight:600}
+
+  #filters{
+    display:flex;gap:6px;padding:8px 16px;background:var(--panel2);
+    border-bottom:1px solid var(--border);overflow-x:auto;z-index:999;
+  }
+  .chip{
+    display:flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;
+    border:1px solid var(--border);background:var(--panel);font-size:.78rem;cursor:pointer;
+    user-select:none;white-space:nowrap;opacity:.45;transition:.15s
+  }
+  .chip.on{opacity:1;border-color:currentColor}
+  .dot{width:9px;height:9px;border-radius:50%;background:currentColor}
+
+  main{flex:1;display:flex;min-height:0}
+  #map{flex:1;background:#0a0f1c}
+  aside{
+    width:360px;min-width:280px;background:var(--panel);border-left:1px solid var(--border);
+    display:flex;flex-direction:column;min-height:0
+  }
+  aside h2{font-size:.85rem;padding:10px 14px;border-bottom:1px solid var(--border);color:var(--muted);letter-spacing:.4px;text-transform:uppercase}
+  #feed{flex:1;overflow-y:auto;padding:8px}
+  .card{
+    background:var(--panel2);border:1px solid var(--border);border-left:4px solid var(--other);
+    border-radius:8px;padding:9px 11px;margin-bottom:7px;cursor:pointer;transition:.15s;
+  }
+  .card:hover{border-color:var(--accent);border-left-width:4px}
+  .card.new{animation:flash 2.5s ease-out}
+  @keyframes flash{0%{background:#1d3a5f}100%{background:var(--panel2)}}
+  .card .top{display:flex;justify-content:space-between;gap:8px;align-items:baseline}
+  .card .cat{font-size:.68rem;font-weight:700;letter-spacing:.5px;text-transform:uppercase}
+  .card .time{font-size:.68rem;color:var(--muted);white-space:nowrap}
+  .card .title{font-size:.83rem;margin:4px 0 2px;line-height:1.35}
+  .card .sub{font-size:.72rem;color:var(--muted)}
+  .empty{color:var(--muted);text-align:center;padding:30px 10px;font-size:.85rem}
+
+  #toasts{position:fixed;bottom:16px;right:16px;z-index:2000;display:flex;flex-direction:column;gap:8px;max-width:340px}
+  .toast{
+    background:var(--panel);border:1px solid var(--border);border-left:4px solid var(--accent);
+    border-radius:8px;padding:10px 14px;font-size:.8rem;box-shadow:0 8px 24px rgba(0,0,0,.5);
+    animation:slidein .3s ease-out
+  }
+  @keyframes slidein{from{transform:translateX(120%)}to{transform:translateX(0)}}
+
+  .leaflet-popup-content-wrapper,.leaflet-popup-tip{background:var(--panel);color:var(--text)}
+  .leaflet-popup-content{font-size:.8rem;line-height:1.45}
+  .leaflet-container a.leaflet-popup-close-button{color:var(--muted)}
+
+  @media(max-width:760px){
+    main{flex-direction:column}
+    aside{width:100%;height:38%;border-left:none;border-top:1px solid var(--border)}
+    header h1 span.full{display:none}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1><span class="pulse" id="pulse"></span>🌍 <span>გლობალური განგაშის მონიტორი</span></h1>
+  <span id="status">იტვირთება…</span>
+  <div class="stats">
+    <span class="stat">🔴 <b id="stRed">0</b> კრიტიკული</span>
+    <span class="stat">🟠 <b id="stOrange">0</b> საშუალო</span>
+    <span class="stat">📊 <b id="stTotal">0</b> სულ</span>
+  </div>
+  <button class="btn" id="notifBtn">🔔 შეტყობინებები</button>
+  <button class="btn" id="refreshBtn">↻ განახლება</button>
+</header>
+
+<div id="filters"></div>
+
+<main>
+  <div id="map"></div>
+  <aside>
+    <h2>ბოლო განგაშები (რეალურ დროში)</h2>
+    <div id="feed"><div class="empty">მონაცემები იტვირთება…</div></div>
+  </aside>
+</main>
+
+<div id="toasts"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+"use strict";
+
+/* ------------------------------------------------------------------ *
+ *  კატეგორიები
+ * ------------------------------------------------------------------ */
+const CATS = {
+  quake:   {label:"მიწისძვრა",      icon:"🌐", color:"var(--quake)",   hex:"#f59e0b"},
+  fire:    {label:"ხანძარი",        icon:"🔥", color:"var(--fire)",    hex:"#ef4444"},
+  storm:   {label:"შტორმი",         icon:"🌀", color:"var(--storm)",   hex:"#8b5cf6"},
+  volcano: {label:"ვულკანი",        icon:"🌋", color:"var(--volcano)", hex:"#f97316"},
+  flood:   {label:"წყალდიდობა",     icon:"🌊", color:"var(--flood)",   hex:"#3b82f6"},
+  weather: {label:"ამინდის განგაში", icon:"⛈️", color:"var(--weather)", hex:"#22d3ee"},
+  other:   {label:"სხვა",           icon:"⚠️", color:"var(--other)",   hex:"#94a3b8"},
+};
+
+const REFRESH_MS = 60_000;          // განახლება ყოველ წუთში
+const state = {
+  alerts: new Map(),                // id -> alert
+  markers: new Map(),               // id -> leaflet marker
+  enabled: new Set(Object.keys(CATS)),
+  seen: new Set(),                  // შეტყობინებისთვის — უკვე ნანახი id-ები
+  firstLoad: true,
+  notify: false,
+};
+
+/* ------------------------------------------------------------------ *
+ *  რუკა
+ * ------------------------------------------------------------------ */
+const map = L.map("map", {worldCopyJump:true, minZoom:2}).setView([25, 20], 2);
+L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png", {
+  attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
+  subdomains:"abcd", maxZoom:19,
+}).addTo(map);
+
+function makeMarker(a){
+  const r = a.severity === "red" ? 10 : a.severity === "orange" ? 7 : 5;
+  const m = L.circleMarker([a.lat, a.lon], {
+    radius:r, color:CATS[a.cat].hex, weight:1.5,
+    fillColor:CATS[a.cat].hex, fillOpacity:.55,
+  });
+  m.bindPopup(
+    `<b>${CATS[a.cat].icon} ${esc(a.title)}</b><br>` +
+    `<span style="color:#8ea0bf">${esc(CATS[a.cat].label)} · ${fmtTime(a.time)}</span><br>` +
+    (a.detail ? esc(a.detail)+"<br>" : "") +
+    (a.url ? `<a href="${esc(a.url)}" target="_blank" rel="noopener">დეტალურად ↗</a>` : "")
+  );
+  return m;
+}
+
+/* ------------------------------------------------------------------ *
+ *  დამხმარეები
+ * ------------------------------------------------------------------ */
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+function fmtTime(t){
+  const d = new Date(t), diff = (Date.now()-d)/60000;
+  if (diff < 1)   return "ახლახან";
+  if (diff < 60)  return Math.round(diff) + " წთ წინ";
+  if (diff < 1440)return Math.round(diff/60) + " სთ წინ";
+  return d.toLocaleString("ka-GE", {month:"short", day:"numeric", hour:"2-digit", minute:"2-digit"});
+}
+
+/* ------------------------------------------------------------------ *
+ *  მონაცემთა წყაროები
+ * ------------------------------------------------------------------ */
+async function fetchJSON(url){
+  const res = await fetch(url, {headers:{Accept:"application/json"}});
+  if (!res.ok) throw new Error(url + " → HTTP " + res.status);
+  return res.json();
+}
+
+/* USGS — მიწისძვრები (ბოლო 24 სთ) */
+async function srcUSGS(){
+  const g = await fetchJSON("https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson");
+  return g.features
+    .filter(f => f.properties.mag >= 2.5)
+    .map(f => ({
+      id: "usgs:" + f.id,
+      cat: "quake",
+      title: `M${f.properties.mag.toFixed(1)} — ${f.properties.place || "უცნობი ადგილი"}`,
+      detail: `მაგნიტუდა ${f.properties.mag.toFixed(1)}, სიღრმე ${Math.round(f.geometry.coordinates[2])} კმ`,
+      severity: f.properties.mag >= 6 ? "red" : f.properties.mag >= 4.5 ? "orange" : "green",
+      time: f.properties.time,
+      lat: f.geometry.coordinates[1], lon: f.geometry.coordinates[0],
+      url: f.properties.url,
+    }));
+}
+
+/* NASA EONET — ღია ბუნებრივი მოვლენები (ხანძრები, შტორმები, ვულკანები…) */
+async function srcEONET(){
+  const g = await fetchJSON("https://eonet.gsfc.nasa.gov/api/v3/events?status=open&limit=300");
+  const catMap = {wildfires:"fire", severeStorms:"storm", volcanoes:"volcano", floods:"flood"};
+  const out = [];
+  for (const ev of g.events){
+    const geo = ev.geometry?.[ev.geometry.length-1];
+    if (!geo) continue;
+    let lat, lon;
+    if (geo.type === "Point") [lon, lat] = geo.coordinates;
+    else if (geo.type === "Polygon") [lon, lat] = geo.coordinates[0][0];
+    else continue;
+    const cat = catMap[ev.categories?.[0]?.id] || "other";
+    out.push({
+      id: "eonet:" + ev.id,
+      cat,
+      title: ev.title,
+      detail: ev.categories?.map(c=>c.title).join(", ") || "",
+      severity: cat === "volcano" || cat === "storm" ? "orange" : "green",
+      time: geo.date || ev.geometry[0]?.date || Date.now(),
+      lat, lon,
+      url: ev.sources?.[0]?.url || "https://eonet.gsfc.nasa.gov/",
+    });
+  }
+  return out;
+}
+
+/* GDACS — გლობალური კატასტროფების განგაშის სისტემა (გაერო/ევროკომისია) */
+async function srcGDACS(){
+  const g = await fetchJSON("https://www.gdacs.org/gdacsapi/api/events/geteventlist/MAP");
+  const catMap = {EQ:"quake", TC:"storm", FL:"flood", VO:"volcano", WF:"fire", DR:"other", TS:"flood"};
+  return (g.features || [])
+    .filter(f => f.properties?.alertlevel && f.properties.alertlevel !== "Green")
+    .map(f => {
+      const p = f.properties;
+      let lat, lon;
+      if (f.geometry?.type === "Point") [lon, lat] = f.geometry.coordinates;
+      else return null;
+      return {
+        id: "gdacs:" + p.eventtype + p.eventid,
+        cat: catMap[p.eventtype] || "other",
+        title: p.name || p.htmldescription || p.eventname || "GDACS მოვლენა",
+        detail: "GDACS დონე: " + p.alertlevel + (p.country ? " · " + p.country : ""),
+        severity: p.alertlevel === "Red" ? "red" : "orange",
+        time: p.fromdate ? Date.parse(p.fromdate) : Date.now(),
+        lat, lon,
+        url: p.url?.report || "https://www.gdacs.org/",
+      };
+    })
+    .filter(Boolean);
+}
+
+/* NWS — აშშ-ის ამინდის აქტიური განგაშები */
+async function srcNWS(){
+  const g = await fetchJSON("https://api.weather.gov/alerts/active?status=actual&message_type=alert&limit=150");
+  const out = [];
+  for (const f of g.features || []){
+    const p = f.properties;
+    let lat = null, lon = null;
+    if (f.geometry?.type === "Polygon"){
+      const ring = f.geometry.coordinates[0];
+      lon = ring.reduce((s,c)=>s+c[0],0)/ring.length;
+      lat = ring.reduce((s,c)=>s+c[1],0)/ring.length;
+    } else continue;                       // გეომეტრიის გარეშე რუკაზე ვერ დავიტანთ
+    if (p.severity !== "Extreme" && p.severity !== "Severe") continue;
+    out.push({
+      id: "nws:" + p.id,
+      cat: "weather",
+      title: p.event + (p.areaDesc ? " — " + p.areaDesc.split(";")[0] : ""),
+      detail: p.headline || "",
+      severity: p.severity === "Extreme" ? "red" : "orange",
+      time: Date.parse(p.sent || p.effective) || Date.now(),
+      lat, lon,
+      url: "https://www.weather.gov/",
+    });
+  }
+  return out;
+}
+
+const SOURCES = [
+  {name:"USGS",  fn:srcUSGS},
+  {name:"EONET", fn:srcEONET},
+  {name:"GDACS", fn:srcGDACS},
+  {name:"NWS",   fn:srcNWS},
+];
+
+/* ------------------------------------------------------------------ *
+ *  განახლების ციკლი
+ * ------------------------------------------------------------------ */
+async function refresh(){
+  const statusEl = document.getElementById("status");
+  const pulse = document.getElementById("pulse");
+  statusEl.textContent = "ახლდება…";
+
+  const results = await Promise.allSettled(SOURCES.map(s => s.fn()));
+  const fresh = [];
+  const okNames = [];
+  results.forEach((r, i) => {
+    if (r.status === "fulfilled"){ fresh.push(...r.value); okNames.push(SOURCES[i].name); }
+    else console.warn("წყარო ჩავარდა:", SOURCES[i].name, r.reason);
+  });
+
+  if (!okNames.length){
+    pulse.classList.add("err");
+    statusEl.textContent = "⚠️ წყაროებთან კავშირი ვერ მოხერხდა — თავიდან ვცდი…";
+    return;
+  }
+  pulse.classList.remove("err");
+
+  const newOnes = [];
+  for (const a of fresh){
+    if (!state.alerts.has(a.id)){
+      state.alerts.set(a.id, a);
+      if (!state.firstLoad) newOnes.push(a);
+    }
+  }
+
+  // მოძველებულების მოცილება (რაც აღარ დაბრუნდა წყაროდან და 24სთ+ ძველია)
+  const freshIds = new Set(fresh.map(a=>a.id));
+  for (const [id, a] of state.alerts){
+    if (!freshIds.has(id) && Date.now() - a.time > 86_400_000){
+      state.alerts.delete(id);
+      const m = state.markers.get(id);
+      if (m){ map.removeLayer(m); state.markers.delete(id); }
+    }
+  }
+
+  render();
+  notifyNew(newOnes);
+  state.firstLoad = false;
+  statusEl.textContent =
+    `✓ განახლდა ${new Date().toLocaleTimeString("ka-GE")} · წყაროები: ${okNames.join(", ")}`;
+}
+
+/* ------------------------------------------------------------------ *
+ *  რენდერი
+ * ------------------------------------------------------------------ */
+function render(){
+  const list = [...state.alerts.values()]
+    .filter(a => state.enabled.has(a.cat))
+    .sort((a,b) => b.time - a.time);
+
+  // სტატისტიკა
+  document.getElementById("stTotal").textContent  = list.length;
+  document.getElementById("stRed").textContent    = list.filter(a=>a.severity==="red").length;
+  document.getElementById("stOrange").textContent = list.filter(a=>a.severity==="orange").length;
+
+  // მარკერები
+  for (const [id, m] of state.markers){
+    const a = state.alerts.get(id);
+    if (!a || !state.enabled.has(a.cat)){ map.removeLayer(m); state.markers.delete(id); }
+  }
+  for (const a of list){
+    if (!state.markers.has(a.id)){
+      const m = makeMarker(a).addTo(map);
+      state.markers.set(a.id, m);
+    }
+  }
+
+  // ლენტა (feed) — ბოლო 120 ჩანაწერი
+  const feed = document.getElementById("feed");
+  feed.innerHTML = "";
+  if (!list.length){
+    feed.innerHTML = '<div class="empty">არჩეული ფილტრებით განგაში არ არის 🎉</div>';
+    return;
+  }
+  for (const a of list.slice(0, 120)){
+    const c = CATS[a.cat];
+    const el = document.createElement("div");
+    el.className = "card" + (state.seen.has(a.id) ? "" : " new");
+    el.style.borderLeftColor = c.hex;
+    el.innerHTML =
+      `<div class="top"><span class="cat" style="color:${c.hex}">${c.icon} ${esc(c.label)}</span>` +
+      `<span class="time">${fmtTime(a.time)}</span></div>` +
+      `<div class="title">${esc(a.title)}</div>` +
+      (a.detail ? `<div class="sub">${esc(a.detail)}</div>` : "");
+    el.onclick = () => {
+      map.flyTo([a.lat, a.lon], 6, {duration:1});
+      state.markers.get(a.id)?.openPopup();
+    };
+    feed.appendChild(el);
+    state.seen.add(a.id);
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ *  შეტყობინებები (ბრაუზერის + ეკრანზე toast)
+ * ------------------------------------------------------------------ */
+function notifyNew(newOnes){
+  const important = newOnes.filter(a => a.severity !== "green" && state.enabled.has(a.cat));
+  for (const a of important.slice(0, 5)){
+    toast(`${CATS[a.cat].icon} ${a.title}`);
+    if (state.notify && Notification.permission === "granted"){
+      new Notification("🌍 ახალი განგაში: " + CATS[a.cat].label, {body:a.title, tag:a.id});
+    }
+  }
+}
+function toast(msg){
+  const box = document.getElementById("toasts");
+  const el = document.createElement("div");
+  el.className = "toast";
+  el.textContent = msg;
+  box.appendChild(el);
+  setTimeout(()=>el.remove(), 8000);
+}
+
+/* ------------------------------------------------------------------ *
+ *  UI — ფილტრები და ღილაკები
+ * ------------------------------------------------------------------ */
+const filtersEl = document.getElementById("filters");
+for (const [key, c] of Object.entries(CATS)){
+  const chip = document.createElement("div");
+  chip.className = "chip on";
+  chip.style.color = c.hex;
+  chip.innerHTML = `<span class="dot"></span>${c.icon} ${esc(c.label)}`;
+  chip.onclick = () => {
+    if (state.enabled.has(key)) state.enabled.delete(key);
+    else state.enabled.add(key);
+    chip.classList.toggle("on");
+    render();
+  };
+  filtersEl.appendChild(chip);
+}
+
+document.getElementById("refreshBtn").onclick = refresh;
+
+const notifBtn = document.getElementById("notifBtn");
+notifBtn.onclick = async () => {
+  if (!("Notification" in window)){ toast("ბრაუზერი შეტყობინებებს არ უჭერს მხარს"); return; }
+  if (state.notify){ state.notify = false; notifBtn.classList.remove("on"); return; }
+  const perm = await Notification.requestPermission();
+  if (perm === "granted"){
+    state.notify = true;
+    notifBtn.classList.add("on");
+    toast("🔔 შეტყობინებები ჩართულია");
+  } else toast("შეტყობინებებზე ნებართვა არ მოგვეცა");
+};
+
+/* ------------------------------------------------------------------ *
+ *  სტარტი
+ * ------------------------------------------------------------------ */
+refresh();
+setInterval(refresh, REFRESH_MS);
+</script>
+</body>
+</html>
